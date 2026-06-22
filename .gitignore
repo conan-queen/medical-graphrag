@@ -1,0 +1,7 @@
+.env
+apikey.txt
+*.db
+__pycache__/
+*.pyc
+server/uploads/
+node_modules/

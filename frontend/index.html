@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>基于GraphRAG的医疗健康知识诊断系统</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.6.0/dist/echarts.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
+<style>
+  :root{
+    --primary:#1AAB94;--primary-deep:#138C79;--primary-soft:#E6F6F1;--primary-line:#B8E6DD;
+    --danger:#F56C6C;--danger-soft:#FEF0F0;
+    --ink:#303133;--regular:#606266;--muted:#909399;--placeholder:#C0C4CC;
+    --bg:#F2F3F5;--surface:#FFFFFF;--line:#EBEEF0;--line2:#E4E7ED;
+    --shadow:0 1px 4px rgba(0,21,41,.06);--shadow2:0 2px 12px rgba(0,21,41,.08);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:"Noto Sans SC",system-ui,sans-serif;background:var(--bg);color:var(--ink);height:100vh;overflow:hidden;font-size:14px}
+  #app{height:100vh}
+  button{font-family:inherit;cursor:pointer;border:none;background:none}
+  input,textarea{font-family:inherit}
+  ::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-thumb{background:#dcdfe6;border-radius:8px}
+
+  /* 登录 */
+  .login-screen{height:100vh;display:grid;place-items:center;
+    background:linear-gradient(135deg,#1AAB94 0%,#0E8C79 100%)}
+  .login-card{width:368px;background:#fff;border-radius:12px;padding:38px 32px;box-shadow:0 12px 40px rgba(0,0,0,.18)}
+  .login-card .lg{display:flex;align-items:center;gap:10px;justify-content:center;margin-bottom:6px}
+  .login-card .lg .ic{width:40px;height:40px;border-radius:10px;background:var(--primary-soft);display:grid;place-items:center;font-size:20px}
+  .login-card h1{font-size:19px;text-align:center}
+  .login-card .sub{font-size:12px;color:var(--muted);text-align:center;margin:6px 0 24px}
+  .login-card label{font-size:13px;color:var(--regular);display:block;margin-bottom:6px}
+  .login-card input{width:100%;padding:11px 13px;border:1px solid var(--line2);border-radius:8px;margin-bottom:16px;font-size:14px;outline:none}
+  .login-card input:focus{border-color:var(--primary)}
+  .login-card .go{width:100%;padding:12px;border-radius:8px;background:var(--primary);color:#fff;font-size:15px;font-weight:500}
+  .login-card .go:hover{background:var(--primary-deep)}
+  .login-card .hint{font-size:12px;color:var(--placeholder);margin-top:16px;text-align:center}
+  .login-card .err{color:var(--danger);font-size:13px;margin-bottom:12px;text-align:center}
+  .login-card .authtab{display:flex;gap:6px;background:#F2F4F5;border-radius:8px;padding:4px;margin:6px 0 18px}
+  .login-card .authtab span{flex:1;text-align:center;padding:8px;border-radius:6px;font-size:14px;color:var(--muted);cursor:pointer}
+  .login-card .authtab span.on{background:#fff;color:var(--primary-deep);font-weight:500;box-shadow:var(--shadow)}
+  .login-card label{margin-top:0}
+
+  /* 顶部导航 */
+  .layout{height:100vh;display:flex;flex-direction:column}
+  .nav{height:60px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 24px;gap:8px;box-shadow:var(--shadow);z-index:20;position:relative}
+  .nav .logo{display:flex;align-items:center;gap:10px;margin-right:26px}
+  .nav .logo .ava{width:34px;height:34px;border-radius:50%;background:var(--primary-soft);display:grid;place-items:center;font-size:18px}
+  .nav .logo b{font-size:16px;white-space:nowrap}
+  .menu{display:flex;align-items:center;height:100%}
+  .menu .it{height:100%;display:flex;align-items:center;gap:5px;padding:0 18px;font-size:14.5px;color:var(--regular);position:relative;border-bottom:3px solid transparent}
+  .menu .it:hover{color:var(--primary)}
+  .menu .it.on{color:var(--primary);border-bottom-color:var(--primary);font-weight:500}
+  .menu .it .caret{font-size:10px;opacity:.7}
+  .dropdown{position:absolute;top:58px;left:0;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow2);min-width:160px;padding:6px;display:none}
+  .menu .it:hover .dropdown{display:block}
+  .dropdown a{display:block;padding:9px 14px;border-radius:6px;color:var(--regular);font-size:14px;white-space:nowrap}
+  .dropdown a:hover{background:var(--primary-soft);color:var(--primary-deep)}
+  .nav .right{margin-left:auto;display:flex;align-items:center;gap:14px}
+  .nav .right .st{font-size:12px;color:var(--muted)}
+  .nav .right .st .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#67C23A;margin-right:4px}
+  .nav .right .st .dot.off{background:#C0C4CC}
+  .nav .user{display:flex;align-items:center;gap:8px;cursor:pointer;position:relative}
+  .nav .user .ua{width:32px;height:32px;border-radius:50%;background:var(--primary);color:#fff;display:grid;place-items:center;font-weight:600}
+  .nav .user:hover .udd{display:block}
+  .udd{position:absolute;top:42px;right:0;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow2);min-width:120px;padding:6px;display:none}
+  .udd a{display:block;padding:8px 12px;border-radius:6px;font-size:14px;color:var(--regular)}
+  .udd a:hover{background:var(--bg)}
+
+  .main{flex:1;overflow:hidden;display:flex}
+
+  /* 通用页面容器 */
+  .page{flex:1;overflow-y:auto;padding:22px 26px}
+  .ph{font-size:18px;font-weight:500;margin-bottom:18px}
+  .btn{padding:8px 15px;border-radius:7px;font-size:13.5px;font-weight:500;border:1px solid var(--line2);background:#fff;color:var(--regular);display:inline-flex;align-items:center;gap:5px}
+  .btn:hover{color:var(--primary);border-color:var(--primary-line)}
+  .btn.pri{background:var(--primary);color:#fff;border-color:var(--primary)}
+  .btn.pri:hover{background:var(--primary-deep);color:#fff}
+  .btn.dgr{background:#fff;color:var(--danger);border-color:#FBC4C4}
+  .btn.dgr:hover{background:var(--danger-soft)}
+  .btn:disabled{opacity:.55;cursor:not-allowed}
+  .field{padding:8px 12px;border:1px solid var(--line2);border-radius:7px;font-size:13.5px;outline:none}
+  .field:focus{border-color:var(--primary)}
+  .bar{display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
+  table{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;font-size:13.5px;box-shadow:var(--shadow)}
+  th,td{padding:12px 14px;text-align:left;border-bottom:1px solid var(--line)}
+  th{background:#FAFAFA;color:var(--regular);font-weight:500;font-size:13px}
+  tr:last-child td{border-bottom:none}
+  .tag{display:inline-block;padding:1px 9px;border-radius:10px;font-size:12px}
+  .tag.g{background:var(--primary-soft);color:var(--primary-deep)}
+  .tag.r{background:var(--danger-soft);color:var(--danger)}
+  .tag.gray{background:#F0F2F5;color:var(--muted)}
+  .progress{height:8px;background:#EBEEF0;border-radius:6px;overflow:hidden;flex:1;min-width:160px}
+  .progress>i{display:block;height:100%;background:var(--primary);transition:width .4s}
+  .note{font-size:12.5px;color:var(--muted);line-height:1.7;margin-bottom:14px}
+
+  /* 控制台 */
+  .stats{display:grid;grid-template-columns:repeat(6,1fr);gap:14px;margin-bottom:20px}
+  .stat{background:#fff;border-radius:10px;padding:18px;box-shadow:var(--shadow)}
+  .stat .n{font-size:28px;font-weight:700;color:var(--primary)}
+  .stat .l{font-size:13px;color:var(--muted);margin-top:3px}
+  .charts{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .cc{background:#fff;border-radius:10px;padding:16px;box-shadow:var(--shadow)}
+  .cc h4{font-size:14px;color:var(--regular);font-weight:500;margin-bottom:8px}
+  .cbox{height:280px}
+
+  /* 卡片网格 */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+  .card{background:#fff;border-radius:10px;padding:18px;box-shadow:var(--shadow);border:1px solid transparent}
+  .card.click{cursor:pointer;transition:.15s}
+  .card.click:hover{border-color:var(--primary-line);box-shadow:var(--shadow2)}
+  .card h4{font-size:15.5px;margin-bottom:2px}
+  .card .code{font-size:11px;color:var(--primary);margin-bottom:8px}
+  .card p{font-size:13px;color:var(--muted);line-height:1.6;margin-top:4px}
+
+  /* 智能问答 */
+  .chat{flex:1;display:flex;min-width:0}
+  .convo{width:248px;background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column;flex-shrink:0;transition:width .2s}
+  .convo.collapsed{width:0;border:none;overflow:hidden}
+  .convo .ch{display:flex;align-items:center;justify-content:space-between;padding:16px 16px 10px}
+  .convo .ch b{font-size:15px}
+  .convo .ch .ops{display:flex;gap:6px}
+  .convo .ch .rb{width:26px;height:26px;border-radius:50%;background:var(--primary);color:#fff;display:grid;place-items:center;font-size:16px}
+  .convo .ch .rb.ghost{background:#F0F2F5;color:var(--muted)}
+  .convo .list{flex:1;overflow-y:auto;padding:4px 12px 12px}
+  .convo .item{padding:11px 12px;border-radius:8px;cursor:pointer;margin-bottom:6px;border:1px solid transparent}
+  .convo .item:hover{background:#FAFAFA}
+  .convo .item.on{background:var(--primary-soft);border-color:var(--primary-line)}
+  .convo .item .t{display:flex;align-items:center;justify-content:space-between;gap:6px}
+  .convo .item .t span{font-size:13.5px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+  .convo .item.on .t span{color:var(--primary-deep);font-weight:500}
+  .convo .item .ic{display:flex;gap:6px;opacity:0}
+  .convo .item:hover .ic{opacity:1}
+  .convo .item .ic i{font-style:normal;color:var(--muted);font-size:13px}
+  .convo .item .ic i:hover{color:var(--primary)}
+  .convo .item .time{font-size:11.5px;color:var(--placeholder);margin-top:3px}
+
+  .chatmain{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--bg)}
+  .chathd{height:56px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 18px;gap:10px}
+  .chathd .ttl{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:500}
+  .chathd .ttl .col{width:28px;height:28px;border-radius:7px;background:var(--primary-soft);display:grid;place-items:center}
+  .chathd .sp{flex:1}
+  .chathd .btn{padding:6px 12px;font-size:13px}
+  .msgs{flex:1;overflow-y:auto;padding:24px 26px;display:flex;flex-direction:column;gap:20px}
+  .welcome{margin:auto;text-align:center;color:var(--muted);max-width:480px}
+  .welcome .wic{font-size:46px;margin-bottom:8px}
+  .welcome h2{font-size:20px;color:var(--ink);margin-bottom:8px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:18px}
+  .chip{font-size:13px;padding:8px 14px;border:1px solid var(--line2);border-radius:18px;background:#fff;color:var(--regular)}
+  .chip:hover{border-color:var(--primary);color:var(--primary)}
+  .row{display:flex;gap:12px;max-width:84%}
+  .row.user{align-self:flex-end;flex-direction:row-reverse}
+  .av{width:34px;height:34px;border-radius:50%;flex-shrink:0;display:grid;place-items:center;font-size:15px;overflow:hidden}
+  .av.u{background:var(--primary);color:#fff;font-weight:600}
+  .av.b{background:var(--primary-soft)}
+  .bubble{padding:12px 16px;border-radius:10px;font-size:14.5px;line-height:1.75;word-break:break-word}
+  .user .bubble{background:var(--primary);color:#fff}
+  .bot .bubble{background:#fff;color:var(--ink);box-shadow:var(--shadow)}
+  .bot .bubble :is(p,ul,ol){margin:0 0 .5em}.bot .bubble :is(ul,ol){padding-left:1.2em}
+  .bot .bubble strong{color:var(--primary-deep)}
+  .imgthumb{max-width:200px;border-radius:8px;margin-bottom:6px;display:block}
+  .loading{display:flex;align-items:center;gap:8px;color:var(--muted)}
+  .spin{width:15px;height:15px;border:2px solid var(--primary-soft);border-top-color:var(--primary);border-radius:50%;animation:sp .7s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .cursor{display:inline-block;width:7px;height:15px;background:var(--primary);animation:bl 1s steps(2) infinite;vertical-align:-2px}
+  @keyframes bl{0%,50%{opacity:1}51%,100%{opacity:0}}
+  .ground{margin-top:10px;border-top:1px dashed var(--line2);padding-top:9px;font-size:12.5px;color:var(--muted)}
+  .ent{display:inline-block;font-size:11.5px;padding:2px 9px;border-radius:11px;background:var(--primary-soft);color:var(--primary-deep);margin:3px 5px 0 0;cursor:pointer}
+  .ent:hover{background:var(--primary);color:#fff}
+  .cite{display:inline-block;font-size:11px;padding:2px 8px;border-radius:9px;background:#FFF3E8;color:#E08C3D;margin:3px 5px 0 0}
+  .trace{margin-top:7px}.trace summary{cursor:pointer;color:var(--primary)}
+  .trace .path{font-family:ui-monospace,monospace;color:var(--regular);padding:3px 0;font-size:11.5px}
+  .related{margin-top:6px}.related b{color:var(--primary-deep)}
+
+  .composer{background:#fff;border-top:1px solid var(--line);padding:12px 18px 14px}
+  .attach{display:inline-flex;align-items:center;gap:8px;background:var(--bg);border-radius:8px;padding:5px 8px;margin-bottom:8px}
+  .attach img{height:38px;border-radius:5px}
+  .attach .rm{color:var(--danger);font-size:13px;cursor:pointer}
+  .composer textarea{width:100%;border:1px solid var(--line2);border-radius:9px;padding:11px 13px;font-size:14.5px;outline:none;resize:none;line-height:1.6;max-height:120px}
+  .composer textarea:focus{border-color:var(--primary)}
+  .crow{display:flex;align-items:center;margin-top:9px;gap:12px}
+  .crow .up{font-size:13px;color:var(--regular);border:1px solid var(--line2);border-radius:7px;padding:6px 12px;display:inline-flex;gap:5px;align-items:center}
+  .crow .up:hover{color:var(--primary);border-color:var(--primary-line)}
+  .crow .sp{flex:1}
+  .crow .tip{font-size:12px;color:var(--placeholder)}
+  .crow .send{background:var(--primary);color:#fff;padding:8px 20px;border-radius:8px;font-size:14px;font-weight:500;display:inline-flex;gap:6px;align-items:center}
+  .crow .send:hover{background:var(--primary-deep)}
+  .crow .send:disabled{opacity:.6;cursor:not-allowed}
+
+  /* 图谱浏览器 */
+  .explorer{flex:1;display:flex;min-width:0}
+  .exside{width:230px;border-right:1px solid var(--line);background:#fff;padding:16px;overflow-y:auto;flex-shrink:0}
+  .exside h4{font-size:13px;color:var(--regular);margin:16px 0 8px;font-weight:500}
+  .exside h4:first-child{margin-top:0}
+  .flt{display:flex;align-items:center;gap:7px;font-size:13px;padding:4px 0;cursor:pointer;color:var(--regular)}
+  .dot{width:11px;height:11px;border-radius:50%}
+  .searchres div{font-size:12.5px;padding:6px 8px;border-radius:6px;cursor:pointer;color:var(--regular)}
+  .searchres div:hover{background:var(--primary-soft);color:var(--primary-deep)}
+  #bigGraph{flex:1;background:var(--bg)}
+  /* 弹窗 */
+  .mask{position:fixed;inset:0;background:rgba(0,0,0,.4);display:grid;place-items:center;z-index:100}
+  .modal{background:#fff;border-radius:12px;width:480px;max-width:92vw;max-height:88vh;overflow-y:auto;box-shadow:0 16px 48px rgba(0,0,0,.2)}
+  .modal .mh{padding:16px 20px;border-bottom:1px solid var(--line);font-size:16px;font-weight:500;display:flex;justify-content:space-between;align-items:center}
+  .modal .mh .x{color:var(--muted);font-size:20px;cursor:pointer}
+  .modal .mb{padding:18px 20px}
+  .modal .mb label{display:block;font-size:13px;color:var(--regular);margin:0 0 5px}
+  .modal .mb .grp{margin-bottom:13px}
+  .modal .mb input,.modal .mb textarea,.modal .mb select{width:100%;padding:9px 12px;border:1px solid var(--line2);border-radius:7px;font-size:13.5px;outline:none;font-family:inherit}
+  .modal .mb input:focus,.modal .mb textarea:focus,.modal .mb select:focus{border-color:var(--primary)}
+  .modal .mf{padding:14px 20px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:10px}
+  .thumbs{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+  .thumbs img{width:56px;height:56px;object-fit:cover;border-radius:7px;border:1px solid var(--line)}
+  .cardimg{width:100%;height:120px;object-fit:cover;border-radius:8px;margin-bottom:8px}
+  .cardops{display:flex;gap:8px;margin-top:10px}
+  /* 右侧检索结果面板 */
+  .retrieval{width:368px;min-width:300px;background:#fff;border-left:1px solid var(--line);display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto}
+  .retrieval .rh{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--line);font-weight:500;position:sticky;top:0;background:#fff;z-index:2}
+  .retrieval .rh .x{color:var(--muted);cursor:pointer;font-size:18px}
+  .rsec{padding:12px 16px;border-bottom:1px solid var(--line)}
+  .rsec h5{font-size:13px;color:var(--regular);margin-bottom:8px;display:flex;align-items:center;justify-content:space-between}
+  .rtable{width:100%;border-collapse:collapse;font-size:12px;box-shadow:none;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .rtable td{padding:6px 8px;border-bottom:1px solid var(--line)}
+  .rtable tr:last-child td{border-bottom:none}
+  #miniGraph{height:300px;width:100%}
+  .rctx{font-size:12px;color:var(--muted);font-family:ui-monospace,monospace;line-height:1.8;max-height:170px;overflow-y:auto}
+  .fullbtn{font-size:12px;color:var(--primary);cursor:pointer;font-weight:400}
+  @media(max-width:980px){.stats{grid-template-columns:repeat(3,1fr)}.charts{grid-template-columns:1fr}.convo,.exside,.retrieval{display:none}}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- 登录 / 注册 -->
+  <div class="login-screen" v-if="!token">
+    <div class="login-card">
+      <div class="lg"><div class="ic">🩺</div></div>
+      <h1>GraphRAG 医疗健康知识诊断系统</h1>
+      <div class="sub">基于知识图谱(Neo4j) + 大语言模型的智能问答</div>
+
+      <div class="authtab">
+        <span :class="{on:authMode==='login'}" @click="authMode='login';loginErr='';regErr=''">登录</span>
+        <span :class="{on:authMode==='register'}" @click="authMode='register';loginErr='';regErr=''">注册</span>
+      </div>
+
+      <template v-if="authMode==='login'">
+        <div class="err" v-if="loginErr">{{ loginErr }}</div>
+        <label>用户名</label>
+        <input v-model="lform.username" placeholder="请输入用户名" @keyup.enter="login">
+        <label>密码</label>
+        <input v-model="lform.password" type="password" placeholder="请输入密码" @keyup.enter="login">
+        <button class="go" @click="login">登 录</button>
+        <div class="hint">默认账号 admin / 123456 · test / 123456</div>
+      </template>
+
+      <template v-else>
+        <div class="err" v-if="regErr">{{ regErr }}</div>
+        <label>用户名</label>
+        <input v-model="rform.username" placeholder="设置用户名" @keyup.enter="register">
+        <label>真实姓名（选填）</label>
+        <input v-model="rform.realName" placeholder="可不填" @keyup.enter="register">
+        <label>密码</label>
+        <input v-model="rform.password" type="password" placeholder="设置密码（至少6位）" @keyup.enter="register">
+        <label>确认密码</label>
+        <input v-model="rform.password2" type="password" placeholder="再次输入密码" @keyup.enter="register">
+        <button class="go" @click="register">注 册</button>
+        <div class="hint">注册为普通用户，成功后将自动登录</div>
+      </template>
+    </div>
+  </div>
+
+  <!-- 主框架 -->
+  <div class="layout" v-else>
+    <!-- 顶部导航 -->
+    <nav class="nav">
+      <div class="logo"><div class="ava">🩺</div><b>基于GraphRAG的医疗健康知识诊断系统</b></div>
+      <div class="menu">
+        <div class="it" :class="{on:view==='dash'}" @click="go('dash')">🖥️ 控制台</div>
+        <div class="it" :class="{on:view==='chat'}" @click="go('chat')">💬 智能问答</div>
+        <div class="it" v-if="isAdmin" :class="{on:view==='users'}" @click="go('users')">👤 用户管理</div>
+        <div class="it" :class="{on:view==='kb'||view==='graph'}">
+          🔗 知识图谱 <span class="caret">▾</span>
+          <div class="dropdown">
+            <a @click="go('kb')">知识图谱管理</a>
+            <a @click="go('graph')">知识图谱可视化</a>
+          </div>
+        </div>
+        <div class="it" :class="{on:view==='disease'||view==='records'}">
+          🗂️ 诊疗管理 <span class="caret">▾</span>
+          <div class="dropdown">
+            <a @click="go('disease')">疾病知识档案</a>
+            <a @click="go('records')">诊断记录</a>
+          </div>
+        </div>
+      </div>
+      <div class="right">
+        <span class="st"><i class="dot" :class="{off:!health.neo4j}"></i>Neo4j</span>
+        <span class="st"><i class="dot" :class="{off:!health.llmAvailable}"></i>{{ health.llmAvailable?('通义千问 '+(health.model||'')):'模板模式' }}</span>
+        <div class="user">
+          <div class="ua">{{ (username[0]||'U').toUpperCase() }}</div>
+          <span>{{ username }}</span>
+          <div class="udd"><a @click="logout">退出登录</a></div>
+        </div>
+      </div>
+    </nav>
+
+    <div class="main">
+      <!-- 控制台 -->
+      <div class="page" v-show="view==='dash'">
+        <div class="ph">控制台 · 数据概览</div>
+        <div class="stats">
+          <div class="stat"><div class="n">{{ stats.userCount||0 }}</div><div class="l">用户数</div></div>
+          <div class="stat"><div class="n">{{ stats.documentCount||0 }}</div><div class="l">文档数</div></div>
+          <div class="stat"><div class="n">{{ stats.conversationCount||0 }}</div><div class="l">会话数</div></div>
+          <div class="stat"><div class="n">{{ stats.qaCount||0 }}</div><div class="l">问答记录</div></div>
+          <div class="stat"><div class="n">{{ stats.diseaseCount||0 }}</div><div class="l">疾病知识</div></div>
+          <div class="stat"><div class="n">{{ stats.recordCount||0 }}</div><div class="l">诊断记录</div></div>
+        </div>
+        <div class="charts">
+          <div class="cc"><h4>知识图谱 · 实体类型分布</h4><div class="cbox" id="pieChart"></div></div>
+          <div class="cc"><h4>知识图谱 · 关系类型 Top10</h4><div class="cbox" id="barChart"></div></div>
+        </div>
+      </div>
+
+      <!-- 智能问答 -->
+      <div class="chat" v-show="view==='chat'">
+        <aside class="convo" :class="{collapsed:convoCollapsed}">
+          <div class="ch">
+            <b>会话列表</b>
+            <div class="ops">
+              <button class="rb" title="新建会话" @click="newConversation">＋</button>
+              <button class="rb ghost" title="收起" @click="convoCollapsed=true">«</button>
+            </div>
+          </div>
+          <div class="list">
+            <div class="item" v-for="c in conversations" :key="c.id"
+                 :class="{on:c.id===activeConv}" @click="openConversation(c.id)">
+              <div class="t">
+                <span>{{ c.title }}</span>
+                <span class="ic">
+                  <i title="重命名" @click.stop="rename(c)">✎</i>
+                  <i title="删除" @click.stop="delConversation(c.id)">🗑</i>
+                </span>
+              </div>
+              <div class="time">{{ c.timeText||'' }}</div>
+            </div>
+            <div v-if="!conversations.length" style="text-align:center;color:var(--placeholder);font-size:13px;padding:20px 0">暂无会话</div>
+          </div>
+        </aside>
+
+        <div class="chatmain">
+          <div class="chathd">
+            <button class="rb ghost" v-if="convoCollapsed" style="width:28px;height:28px;border-radius:7px;background:#F0F2F5" @click="convoCollapsed=false">»</button>
+            <div class="ttl"><span class="col">💬</span>{{ currentTitle }}</div>
+            <div class="sp"></div>
+            <button class="btn pri" :disabled="!activeConv" @click="exportWord">⤓ 导出咨询记录</button>
+            <button class="btn pri" :disabled="!activeConv" @click="genTitle">✈ 生成标题</button>
+            <button class="btn dgr" :disabled="!activeConv" @click="clearRecords">🗑 清除记录</button>
+          </div>
+
+          <div class="msgs" ref="msgBox">
+            <div class="welcome" v-if="!messages.length">
+              <div class="wic">🩺</div>
+              <h2>描述症状，或询问某个疾病</h2>
+              <p>系统先在知识图谱中做多跳检索与路径推理，再交给大模型作答；回答会标注所依据的图谱三元组、来源文档与关联疾病/诊断记录。</p>
+              <div class="chips"><button class="chip" v-for="q in samples" :key="q" @click="ask(q)">{{ q }}</button></div>
+            </div>
+            <div class="row" :class="m.role" v-for="(m,i) in messages" :key="i">
+              <div class="av" :class="m.role==='user'?'u':'b'">{{ m.role==='user'?'我':'🩺' }}</div>
+              <div>
+                <div class="bubble" v-if="m.role==='user'">
+                  <img v-if="m.image" :src="m.image" class="imgthumb">
+                  {{ m.text }}
+                </div>
+                <div class="bubble" v-else>
+                  <div class="loading" v-if="m.loading"><span class="spin"></span>正在检索相关知识...</div>
+                  <template v-else>
+                    <span v-html="render(m.text)"></span><span class="cursor" v-if="m.streaming"></span>
+                    <div class="ground" v-if="m.meta && (m.meta.entities.length||m.meta.citations.length)">
+                      <div v-if="m.meta.entities.length">命中实体（点击查看图谱）：
+                        <span class="ent" v-for="e in m.meta.entities" :key="e" @click="focusEntity(e)">{{ e }}</span>
+                      </div>
+                      <div v-if="m.meta.citations.length" style="margin-top:4px">来源文档：
+                        <span class="cite" v-for="c in m.meta.citations" :key="c">{{ c }}</span>
+                      </div>
+                      <details class="trace" v-if="m.meta.reasoning && m.meta.reasoning.length">
+                        <summary>查看推理链路（{{ m.meta.reasoning.length }} 条路径 · 召回三元组 {{ m.meta.tripleCount }} 条）</summary>
+                        <div class="path" v-for="(p,k) in m.meta.reasoning" :key="k">{{ p }}</div>
+                      </details>
+                      <div class="related" v-if="m.meta.related && m.meta.related.diseases.length">关联疾病档案：
+                        <b>{{ m.meta.related.diseases.map(d=>d.name).join('、') }}</b>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="composer">
+            <div class="attach" v-if="imageData">
+              <img :src="imageData"><span style="font-size:12.5px;color:var(--regular)">已添加图片</span>
+              <span class="rm" @click="imageData=null;imageFile=null">移除</span>
+            </div>
+            <textarea v-model="input" rows="2" placeholder="请输入您的问题..."
+                      @keydown.enter.exact.prevent="ask()"></textarea>
+            <div class="crow">
+              <label class="up">🖼 上传图片<input type="file" accept="image/*" style="display:none" @change="pickImage"></label>
+              <label class="tip" style="display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" v-model="useStream">流式</label>
+              <div class="sp"></div>
+              <span class="tip">按 Enter 发送，Shift+Enter 换行</span>
+              <button class="send" :disabled="streaming||(!input.trim()&&!imageFile)" @click="ask()">
+                <span class="spin" v-if="streaming" style="border-top-color:#fff;border-color:rgba(255,255,255,.4)"></span>
+                {{ streaming?'思考中...':'发送' }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <aside class="retrieval" v-show="showRetrieval && retrieval.triples.length">
+          <div class="rh"><span>🔍 检索结果</span><span class="x" @click="showRetrieval=false">×</span></div>
+          <div class="rsec">
+            <h5>📋 召回知识（{{ retrieval.triples.length }} 条三元组）</h5>
+            <table class="rtable"><tbody>
+              <tr v-for="(t,i) in retrieval.triples.slice(0,25)" :key="i">
+                <td><span class="tag g" style="font-size:11px">{{ t.head_type }}</span></td>
+                <td>{{ t.head }}</td>
+                <td style="color:var(--muted)">{{ t.relation }}</td>
+                <td>{{ t.tail }}</td>
+              </tr>
+            </tbody></table>
+          </div>
+          <div class="rsec">
+            <h5>🔗 图谱可视化 <span class="fullbtn" @click="focusEntity(retrieval.mainEntity)">全屏 ↗</span></h5>
+            <div id="miniGraph"></div>
+          </div>
+          <div class="rsec">
+            <h5>📄 图谱上下文</h5>
+            <div class="rctx"><div v-for="(l,i) in retrieval.lines" :key="i">{{ l }}</div></div>
+          </div>
+        </aside>
+      </div>
+
+      <!-- 用户管理 -->
+      <div class="page" v-show="view==='users'">
+        <div class="ph">用户管理</div>
+        <div class="bar">
+          <input class="field" v-model="userKw" placeholder="按用户名搜索" @keyup.enter="loadUsers">
+          <button class="btn pri" @click="loadUsers">搜索</button>
+        </div>
+        <table>
+          <thead><tr><th>ID</th><th>用户名</th><th>姓名</th><th>角色</th><th>状态</th><th>注册时间</th><th>操作</th></tr></thead>
+          <tbody>
+            <tr v-for="u in users" :key="u.id">
+              <td>{{ u.id }}</td><td>{{ u.username }}</td><td>{{ u.realName||'—' }}</td>
+              <td><span class="tag" :class="u.role===1?'g':'gray'">{{ u.role===1?'管理员':'普通用户' }}</span></td>
+              <td><span class="tag" :class="u.status===1?'g':'r'">{{ u.status===1?'启用':'禁用' }}</span></td>
+              <td style="color:var(--muted)">{{ u.createTime }}</td>
+              <td>
+                <button class="btn" @click="toggleStatus(u)">{{ u.status===1?'禁用':'启用' }}</button>
+                <button class="btn" @click="resetPwd(u.id)">重置密码</button>
+                <button class="btn dgr" @click="delUser(u.id)">删除</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 知识图谱管理 -->
+      <div class="page" v-show="view==='kb'">
+        <div class="ph">知识图谱管理</div>
+        <div class="bar">
+          <label class="btn pri">⤒ 上传文档<input type="file" accept=".txt,.md,.pdf,.docx" style="display:none" @change="upload"></label>
+          <button class="btn" @click="build('incremental')" :disabled="!isAdmin||building">增量构建</button>
+          <button class="btn" @click="build('full')" :disabled="!isAdmin||building">全量重建</button>
+          <div class="progress" v-if="building"><i :style="{width:task.progress+'%'}"></i></div>
+          <span class="note" style="margin:0" v-if="task.message">{{ task.message }}<span v-if="building">（{{ task.progress }}%）</span></span>
+        </div>
+        <div class="note">上传 txt/md/pdf/docx 后点击「构建」——系统用大模型从文档中抽取 &lt;头实体, 关系, 尾实体&gt; 三元组写入 Neo4j（异步任务，可看进度）。无 LLM key 时使用内置示例三元组。{{ isAdmin?'':'（构建需管理员）' }}</div>
+        <table>
+          <thead><tr><th>文档</th><th>AI 摘要</th><th>已建图</th><th>上传时间</th><th>操作</th></tr></thead>
+          <tbody>
+            <tr v-for="d in docs" :key="d.id">
+              <td>{{ d.name }}</td><td style="color:var(--muted);max-width:360px">{{ d.summary||'—' }}</td>
+              <td><span class="tag" :class="d.isGraphBuilt?'g':'gray'">{{ d.isGraphBuilt?'已构建':'未构建' }}</span></td>
+              <td style="color:var(--muted)">{{ d.createTime }}</td>
+              <td><button class="btn dgr" @click="delDoc(d.id)">删除</button></td>
+            </tr>
+            <tr v-if="!docs.length"><td colspan="5" style="text-align:center;color:var(--placeholder)">暂无文档，请先上传</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 知识图谱可视化 -->
+      <div class="explorer" v-show="view==='graph'">
+        <aside class="exside">
+          <h4>节点搜索</h4>
+          <input class="field" style="width:100%" v-model="gkw" placeholder="输入实体名" @input="searchNode">
+          <div class="searchres">
+            <div v-for="r in searchHits" :key="r.name" @click="focusEntity(r.name)">{{ r.name }} <span style="color:var(--placeholder)">· {{ r.type }}（{{ r.degree }}）</span></div>
+          </div>
+          <h4>实体类型过滤</h4>
+          <label class="flt" v-for="t in allTypes" :key="t">
+            <input type="checkbox" :value="t" v-model="activeTypes" @change="drawBig">
+            <i class="dot" :style="{background:typeColor(t)}"></i>{{ t }}
+          </label>
+          <h4>布局</h4>
+          <label class="flt"><input type="radio" value="force" v-model="glayout" @change="drawBig"> 力导向布局</label>
+          <label class="flt"><input type="radio" value="circular" v-model="glayout" @change="drawBig"> 环形布局</label>
+          <h4>统计</h4>
+          <div class="note" style="margin:0">节点 {{ gstats.nodes||0 }} · 关系 {{ gstats.edges||0 }}</div>
+        </aside>
+        <div id="bigGraph"></div>
+      </div>
+
+      <!-- 疾病知识档案 -->
+      <div class="page" v-show="view==='disease'">
+        <div class="ph">疾病知识档案</div>
+        <div class="bar">
+          <input class="field" v-model="dkw" placeholder="按疾病名 / 编号搜索" @keyup.enter="loadDiseases">
+          <button class="btn pri" @click="loadDiseases">搜索</button>
+          <button class="btn" v-if="isAdmin" @click="openDiseaseModal()">＋ 新增疾病</button>
+        </div>
+        <div class="grid">
+          <div class="card" v-for="d in diseases" :key="d.id">
+            <img v-if="d.image_path" :src="fileUrl(d.image_path)" class="cardimg">
+            <h4>{{ d.name }}</h4><div class="code">{{ d.product_code }}</div>
+            <p>病因：{{ d.cause }}</p>
+            <p>诊疗路径：{{ d.diagnosis_path }}</p>
+            <p v-if="d.diagnosis_standard">诊断标准：{{ d.diagnosis_standard }}</p>
+            <div class="cardops">
+              <button class="btn pri" @click="askDisease(d)">提问</button>
+              <template v-if="isAdmin">
+                <button class="btn" @click="openDiseaseModal(d)">编辑</button>
+                <label class="btn">传图<input type="file" accept="image/*" style="display:none" @change="uploadDiseaseImg($event,d.id)"></label>
+                <button class="btn dgr" @click="delDisease(d.id)">删除</button>
+              </template>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 诊断记录 -->
+      <div class="page" v-show="view==='records'">
+        <div class="ph">诊断记录</div>
+        <div class="bar">
+          <select class="field" v-model="recFilter" @change="loadRecords">
+            <option value="">全部疾病</option>
+            <option v-for="d in diseases" :key="d.id" :value="d.id">{{ d.name }}</option>
+          </select>
+          <button class="btn" v-if="isAdmin" @click="openRecordModal()">＋ 新增记录</button>
+        </div>
+        <table>
+          <thead><tr><th>病例编号</th><th>关联疾病</th><th>诊疗科室</th><th>主治医生</th><th>状态</th><th>图片</th><th>时间</th><th v-if="isAdmin">操作</th></tr></thead>
+          <tbody>
+            <tr v-for="r in records" :key="r.id">
+              <td>{{ r.batch_number||'—' }}</td><td>{{ r.disease_name||'—' }}</td>
+              <td>{{ r.production_line||'—' }}</td><td>{{ r.doctor||'—' }}</td>
+              <td><span class="tag g">{{ r.status||'—' }}</span></td>
+              <td><div class="thumbs"><img v-for="im in r.images" :key="im" :src="fileUrl(im)"></div></td>
+              <td style="color:var(--muted)">{{ r.create_time }}</td>
+              <td v-if="isAdmin">
+                <button class="btn" @click="openRecordModal(r)">编辑</button>
+                <label class="btn">传图<input type="file" accept="image/*" multiple style="display:none" @change="uploadRecordImgs($event,r.id)"></label>
+                <button class="btn dgr" @click="delRecord(r.id)">删除</button>
+              </td>
+            </tr>
+            <tr v-if="!records.length"><td :colspan="isAdmin?8:7" style="text-align:center;color:var(--placeholder)">暂无诊断记录</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 疾病弹窗 -->
+      <div class="mask" v-if="showDiseaseModal" @click.self="showDiseaseModal=false">
+        <div class="modal">
+          <div class="mh">{{ diseaseForm.id?'编辑疾病':'新增疾病' }}<span class="x" @click="showDiseaseModal=false">×</span></div>
+          <div class="mb">
+            <div class="grp"><label>疾病名称 *</label><input v-model="diseaseForm.name" placeholder="如 原发性高血压"></div>
+            <div class="grp"><label>疾病编号</label><input v-model="diseaseForm.productCode" placeholder="如 D001"></div>
+            <div class="grp"><label>病因</label><textarea v-model="diseaseForm.cause" rows="2"></textarea></div>
+            <div class="grp"><label>诊疗路径</label><textarea v-model="diseaseForm.diagnosisPath" rows="2"></textarea></div>
+            <div class="grp"><label>诊断标准</label><textarea v-model="diseaseForm.diagnosisStandard" rows="2"></textarea></div>
+          </div>
+          <div class="mf"><button class="btn" @click="showDiseaseModal=false">取消</button><button class="btn pri" @click="saveDisease">保存</button></div>
+        </div>
+      </div>
+
+      <!-- 诊断记录弹窗 -->
+      <div class="mask" v-if="showRecordModal" @click.self="showRecordModal=false">
+        <div class="modal">
+          <div class="mh">{{ recordForm.id?'编辑记录':'新增记录' }}<span class="x" @click="showRecordModal=false">×</span></div>
+          <div class="mb">
+            <div class="grp"><label>关联疾病 *</label>
+              <select v-model="recordForm.productId"><option value="">请选择</option>
+                <option v-for="d in diseases" :key="d.id" :value="d.id">{{ d.name }}</option></select></div>
+            <div class="grp"><label>病例编号</label><input v-model="recordForm.batchNumber"></div>
+            <div class="grp"><label>诊疗科室</label><input v-model="recordForm.productionLine"></div>
+            <div class="grp"><label>主治医生</label><input v-model="recordForm.doctor"></div>
+            <div class="grp"><label>诊断状态</label><input v-model="recordForm.status" placeholder="如 已审核 / 待审核"></div>
+            <div class="grp"><label>备注</label><textarea v-model="recordForm.note" rows="2"></textarea></div>
+          </div>
+          <div class="mf"><button class="btn" @click="showRecordModal=false">取消</button><button class="btn pri" @click="saveRecord">保存</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const { createApp } = Vue;
+const API = (location.protocol==="http:"||location.protocol==="https:") ? "/api" : "http://127.0.0.1:5010/api";
+const TYPE_COLOR={疾病:"#1AAB94",症状:"#E08C3D",病因:"#B05A3C",诊断步骤:"#C99A2E",治疗步骤:"#3E8E5A",
+  医疗设备:"#5B6B8A",临床指标:"#8A5BA0",科室:"#2C7DA0",检验项目:"#3DA5A5",药物:"#C0566E",并发症:"#9A6B3F",实体:"#909399"};
+
+createApp({
+  data(){return{
+    token:localStorage.getItem("token")||"", role:Number(localStorage.getItem("role")||0),
+    username:localStorage.getItem("username")||"", lform:{username:"admin",password:"123456"}, loginErr:"",
+    authMode:"login", rform:{username:"",password:"",password2:"",realName:""}, regErr:"",
+    health:{neo4j:false,llmAvailable:false,model:""},
+    view:"dash",
+    input:"", messages:[], streaming:false, useStream:true,
+    imageFile:null, imageData:null,
+    conversations:[], activeConv:null, convoCollapsed:false,
+    showRetrieval:false, retrieval:{entities:[],triples:[],mainEntity:'',lines:[]}, miniChart:null,
+    docs:[], building:false, task:{progress:0,message:""},
+    diseases:[], dkw:"", records:[], recFilter:"",
+    showDiseaseModal:false, diseaseForm:{}, showRecordModal:false, recordForm:{},
+    users:[], userKw:"",
+    stats:{}, pie:null, bar:null,
+    bigChart:null, gstats:{}, glayout:"force",
+    allTypes:["疾病","症状","病因","诊断步骤","治疗步骤","医疗设备","临床指标","科室","检验项目","药物","并发症"],
+    activeTypes:["疾病","症状","病因","诊断步骤","治疗步骤","医疗设备","临床指标","科室","检验项目","药物","并发症"],
+    gkw:"", searchHits:[],
+    samples:["感冒与流感的鉴别诊断要点有哪些？","高血压有哪些症状？该怎么治疗？","2型糖尿病怎么诊断？","慢性胃炎该挂什么科？"]
+  }},
+  computed:{
+    isAdmin(){return this.role===1;},
+    currentTitle(){const c=this.conversations.find(x=>x.id===this.activeConv);return c?c.title:"新会话";}
+  },
+  mounted(){ if(this.token){this.fetchHealth();this.loadConversations();this.loadDashboard();} window.addEventListener("resize",()=>this.resize()); },
+  methods:{
+    H(e){return Object.assign({Authorization:"Bearer "+this.token},e||{});},
+    render(t){try{return marked.parse(t||"");}catch(e){return t;}},
+    typeColor(t){return TYPE_COLOR[t]||"#909399";},
+    resize(){[this.pie,this.bar,this.bigChart,this.miniChart].forEach(c=>c&&c.resize());},
+    go(v){this.view=v; if(v==='dash')this.loadDashboard(); if(v==='chat')this.loadConversations();
+      if(v==='kb')this.loadDocs(); if(v==='graph')this.openExplorer(); if(v==='disease')this.loadDiseases();
+      if(v==='records'){this.loadDiseases();this.loadRecords();} if(v==='users')this.loadUsers();},
+
+    async login(){
+      this.loginErr="";
+      try{
+        const d=await(await fetch(API+"/user/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(this.lform)})).json();
+        if(d.code!==200){this.loginErr=d.msg;return;}
+        this.token=d.data.token;this.role=d.data.userInfo.role;this.username=d.data.userInfo.username;
+        localStorage.setItem("token",this.token);localStorage.setItem("role",this.role);localStorage.setItem("username",this.username);
+        this.fetchHealth();this.loadConversations();this.loadDashboard();
+      }catch(e){this.loginErr="无法连接后端，请确认服务已启动";}
+    },
+    logout(){this.token="";localStorage.clear();this.messages=[];this.conversations=[];},
+    async register(){
+      this.regErr="";
+      const f=this.rform;
+      if(!f.username.trim()||!f.password){this.regErr="用户名和密码不能为空";return;}
+      if(f.password.length<6){this.regErr="密码至少 6 位";return;}
+      if(f.password!==f.password2){this.regErr="两次输入的密码不一致";return;}
+      try{
+        const d=await(await fetch(API+"/user/register",{method:"POST",headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({username:f.username.trim(),password:f.password,realName:f.realName||undefined})})).json();
+        if(d.code!==200){this.regErr=d.msg;return;}
+        // 注册成功 → 自动登录
+        this.lform.username=f.username.trim();this.lform.password=f.password;
+        this.authMode="login";
+        await this.login();
+      }catch(e){this.regErr="无法连接后端，请确认服务已启动";}
+    },
+    async fetchHealth(){try{this.health=(await(await fetch(API+"/health")).json()).data;}catch(e){}},
+
+    /* 会话 */
+    async loadConversations(){try{
+      const list=(await(await fetch(API+"/qa/conversation/list",{headers:this.H()})).json()).data||[];
+      this.conversations=list.map(c=>({...c,timeText:this.timeAgo(c.createTime)}));
+    }catch(e){}},
+    timeAgo(t){if(!t)return"";const d=new Date(t.replace(" ","T")); if(isNaN(d))return""; const s=(Date.now()-d)/1000;
+      if(s<60)return"刚刚"; if(s<3600)return Math.floor(s/60)+"分钟前"; if(s<86400)return Math.floor(s/3600)+"小时前"; return Math.floor(s/86400)+"天前";},
+    newConversation(){this.activeConv=null;this.messages=[];},
+    async openConversation(id){
+      this.activeConv=id;
+      const d=(await(await fetch(API+"/qa/history/"+id,{headers:this.H()})).json()).data||[];
+      this.messages=[];
+      d.forEach(h=>{this.messages.push({role:"user",text:h.question});
+        this.messages.push({role:"bot",text:h.answer,meta:{entities:(h.entities||"").split("、").filter(Boolean),citations:[],reasoning:[],related:{diseases:[]},tripleCount:0}});});
+      this.scroll();
+    },
+    async delConversation(id){await fetch(API+"/qa/conversation/"+id,{method:"DELETE",headers:this.H()});
+      if(id===this.activeConv)this.newConversation(); this.loadConversations();},
+    async rename(c){const t=prompt("重命名会话",c.title); if(!t)return;
+      await fetch(API+"/qa/conversation/"+c.id,{method:"PUT",headers:this.H({"Content-Type":"application/json"}),body:JSON.stringify({title:t})});
+      this.loadConversations();},
+    async genTitle(){if(!this.activeConv)return;
+      const d=await(await fetch(API+"/qa/conversation/"+this.activeConv+"/title",{method:"POST",headers:this.H()})).json();
+      if(d.code===200)this.loadConversations(); else alert(d.msg);},
+    async clearRecords(){if(!this.activeConv)return; if(!confirm("确定清除本会话的全部记录？"))return;
+      await fetch(API+"/qa/conversation/"+this.activeConv+"/clear",{method:"POST",headers:this.H()}); this.messages=[];},
+    async exportWord(){const r=await fetch(API+"/qa/export/"+this.activeConv,{headers:this.H()});
+      const b=await r.blob();const u=URL.createObjectURL(b);const a=document.createElement("a");a.href=u;a.download="问答咨询记录.docx";a.click();URL.revokeObjectURL(u);},
+
+    /* 图片 */
+    pickImage(ev){const f=ev.target.files[0];if(!f)return;this.imageFile=f;
+      const r=new FileReader();r.onload=()=>this.imageData=r.result;r.readAsDataURL(f);ev.target.value="";},
+
+    /* 提问 */
+    async ask(q){
+      const question=(q||this.input).trim();
+      if((!question&&!this.imageFile)||this.streaming)return;
+      this.messages.push({role:"user",text:question||"[图片]",image:this.imageData});
+      const hadImage=!!this.imageFile;
+      this.input="";
+      this.scroll();
+      if(hadImage){await this.askImage(question);}
+      else if(this.useStream){await this.askStream(question);}
+      else{await this.askOnce(question);}
+      this.loadConversations();
+    },
+    async askImage(question){
+      this.streaming=true;
+      const bot={role:"bot",text:"",loading:true,meta:null};this.messages.push(bot);this.scroll();
+      const fd=new FormData();fd.append("image",this.imageFile);fd.append("question",question||"");
+      if(this.activeConv)fd.append("conversationId",this.activeConv);
+      this.imageFile=null;this.imageData=null;
+      try{
+        const d=(await(await fetch(API+"/qa/chat/image",{method:"POST",headers:this.H(),body:fd})).json());
+        bot.loading=false;
+        if(d.code!==200){bot.text=d.msg;}
+        else{bot.text=d.data.answer;bot.meta=this.meta(d.data);this.updateRetrieval(d.data);this.activeConv=d.data.conversationId;}
+      }catch(e){bot.loading=false;bot.text="图片识别请求失败。";}
+      this.streaming=false;this.scroll();
+    },
+    async askOnce(question){
+      this.streaming=true;
+      const bot={role:"bot",text:"",loading:true,meta:null};this.messages.push(bot);this.scroll();
+      try{
+        const d=(await(await fetch(API+"/qa/chat",{method:"POST",headers:this.H({"Content-Type":"application/json"}),body:JSON.stringify({question,conversationId:this.activeConv})})).json());
+        bot.loading=false;
+        if(d.code!==200){bot.text=d.msg;}
+        else{bot.text=d.data.answer;bot.meta=this.meta(d.data);this.updateRetrieval(d.data);this.activeConv=d.data.conversationId;}
+      }catch(e){bot.loading=false;bot.text="请求失败，请确认后端已启动。";}
+      this.streaming=false;this.scroll();
+    },
+    async askStream(question){
+      this.streaming=true;
+      const bot={role:"bot",text:"",loading:true,streaming:false,meta:null};this.messages.push(bot);this.scroll();
+      try{
+        const resp=await fetch(API+"/qa/chat/stream",{method:"POST",headers:this.H({"Content-Type":"application/json"}),body:JSON.stringify({question,conversationId:this.activeConv})});
+        const reader=resp.body.getReader();const dec=new TextDecoder();let buf="";
+        while(true){
+          const{value,done}=await reader.read();if(done)break;
+          buf+=dec.decode(value,{stream:true});let idx;
+          while((idx=buf.indexOf("\n\n"))>=0){
+            const chunk=buf.slice(0,idx);buf=buf.slice(idx+2);
+            const ev=(chunk.match(/event: (.*)/)||[])[1];const dl=(chunk.match(/data: (.*)/s)||[])[1];
+            if(!dl)continue;const data=JSON.parse(dl);
+            if(ev==="meta"){bot.loading=false;bot.streaming=true;bot.meta=this.meta(data);this.updateRetrieval(data);this.activeConv=data.conversationId;}
+            else if(ev==="delta"){bot.text+=data.text;this.scroll();}
+            else if(ev==="done"){this.activeConv=data.conversationId;}
+          }
+        }
+      }catch(e){bot.loading=false;bot.text=bot.text||"流式请求失败，请确认后端已启动。";}
+      bot.streaming=false;this.streaming=false;this.scroll();
+    },
+    meta(d){return{entities:d.entities||[],citations:d.citations||[],reasoning:d.reasoning||[],related:d.related||{diseases:[]},tripleCount:d.tripleCount||0};},
+    updateRetrieval(d){
+      const tr=d.triples||[];
+      this.retrieval={entities:d.entities||[],triples:tr,mainEntity:(d.entities&&d.entities[0])||"",
+        lines:tr.map(t=>`(${t.head})-[${t.relation}]->(${t.tail})`)};
+      this.showRetrieval=tr.length>0;
+      if(tr.length)this.drawMini(tr);
+    },
+    drawMini(triples){
+      this.$nextTick(()=>{
+        const el=document.getElementById("miniGraph");if(!el)return;
+        if(!this.miniChart)this.miniChart=echarts.init(el);
+        const nodes={},edges=[];
+        triples.forEach(t=>{nodes[t.head]={id:t.head,name:t.head,type:t.head_type||"实体"};
+          nodes[t.tail]={id:t.tail,name:t.tail,type:t.tail_type||"实体"};
+          edges.push({source:t.head,target:t.tail,name:t.relation});});
+        const g={nodes:Object.values(nodes),edges};
+        const deg={};edges.forEach(e=>{deg[e.source]=(deg[e.source]||0)+1;deg[e.target]=(deg[e.target]||0)+1;});
+        g.nodes.forEach(n=>n.degree=deg[n.id]||0);
+        this.miniChart.setOption(this.graphOption(g,"force"),true);
+        this.miniChart.resize();
+      });
+    },
+
+    /* 图谱 */
+    graphOption(g,layout){
+      const cats=[...new Set(g.nodes.map(n=>n.type))];
+      return{tooltip:{formatter:p=>p.dataType==="edge"?p.data.name:p.data.name},
+        legend:[{data:cats,bottom:0,textStyle:{fontSize:11},icon:"circle"}],
+        series:[{type:"graph",layout:layout||"force",roam:true,draggable:true,
+          force:{repulsion:260,edgeLength:[70,150]},
+          label:{show:true,fontSize:11,color:"#303133"},
+          edgeLabel:{show:true,fontSize:9,color:"#909399",formatter:p=>p.data.name},
+          categories:cats.map(c=>({name:c,itemStyle:{color:TYPE_COLOR[c]||"#909399"}})),
+          data:g.nodes.map(n=>({name:n.name,category:n.type,symbolSize:Math.min(48,18+(n.degree||0)*4)})),
+          links:g.edges.map(e=>({source:e.source,target:e.target,name:e.name})),
+          lineStyle:{color:"#C8D0D6",curveness:0.08},emphasis:{focus:"adjacency"}}]};
+    },
+    async openExplorer(){try{this.gstats=(await(await fetch(API+"/knowledge-graph/stats",{headers:this.H()})).json()).data||{};}catch(e){}this.drawBig();},
+    async drawBig(){
+      try{
+        const g=(await(await fetch(API+"/knowledge-graph/visualize?types="+encodeURIComponent(this.activeTypes.join(",")),{headers:this.H()})).json()).data;
+        this.$nextTick(()=>{if(!this.bigChart)this.bigChart=echarts.init(document.getElementById("bigGraph"));
+          this.bigChart.setOption(this.graphOption(g,this.glayout),true);
+          this.bigChart.off("dblclick");this.bigChart.on("dblclick",p=>{if(p.dataType==="node")this.focusEntity(p.data.name);});});
+      }catch(e){}
+    },
+    async searchNode(){if(!this.gkw.trim()){this.searchHits=[];return;}
+      try{this.searchHits=(await(await fetch(API+"/knowledge-graph/search?keyword="+encodeURIComponent(this.gkw),{headers:this.H()})).json()).data||[];}catch(e){}},
+    async focusEntity(name){this.view="graph";
+      try{const g=(await(await fetch(API+"/knowledge-graph/visualize?name="+encodeURIComponent(name),{headers:this.H()})).json()).data;
+        this.$nextTick(()=>{if(!this.bigChart)this.bigChart=echarts.init(document.getElementById("bigGraph"));this.bigChart.setOption(this.graphOption(g,this.glayout),true);});
+      }catch(e){}},
+
+    /* 知识库 */
+    async loadDocs(){try{this.docs=(await(await fetch(API+"/document/list",{headers:this.H()})).json()).data||[];}catch(e){}},
+    async upload(ev){const f=ev.target.files[0];if(!f)return;const fd=new FormData();fd.append("file",f);
+      this.task={progress:0,message:"上传中…"};this.building=true;
+      try{const d=await(await fetch(API+"/document/upload",{method:"POST",headers:this.H(),body:fd})).json();this.task={progress:100,message:d.msg};this.loadDocs();}catch(e){this.task.message="上传失败";}
+      this.building=false;ev.target.value="";},
+    async delDoc(id){await fetch(API+"/document/"+id,{method:"DELETE",headers:this.H()});this.loadDocs();},
+    async build(type){this.building=true;this.task={progress:0,message:"启动构建任务…"};
+      try{const d=await(await fetch(API+"/knowledge-graph/build/"+type,{method:"POST",headers:this.H()})).json();
+        if(d.code!==200){this.task.message=d.msg;this.building=false;return;}this.poll(d.data.taskId);}catch(e){this.task.message="构建失败";this.building=false;}},
+    poll(tid){const t=setInterval(async()=>{try{const s=(await(await fetch(API+"/knowledge-graph/task/"+tid,{headers:this.H()})).json()).data;this.task=s;
+      if(s.status==="success"||s.status==="failed"){clearInterval(t);this.building=false;this.loadDocs();}}catch(e){clearInterval(t);this.building=false;}},800);},
+
+    /* 疾病 / 诊断 / 用户 / 看板 */
+    async loadDiseases(){try{this.diseases=(await(await fetch(API+"/product-info/list?keyword="+encodeURIComponent(this.dkw),{headers:this.H()})).json()).data||[];}catch(e){}},
+    askDisease(d){this.view="chat";this.newConversation();this.ask(d.name+"有哪些症状和治疗方法？");},
+    fileUrl(n){return API+"/file/"+n;},
+    openDiseaseModal(d){this.diseaseForm=d?{id:d.id,name:d.name,productCode:d.product_code,cause:d.cause,diagnosisPath:d.diagnosis_path,diagnosisStandard:d.diagnosis_standard}:{};this.showDiseaseModal=true;},
+    async saveDisease(){
+      if(!this.diseaseForm.name){alert("请填写疾病名称");return;}
+      const f=this.diseaseForm,m=f.id?"PUT":"POST",url=API+"/product-info"+(f.id?"/"+f.id:"");
+      const d=await(await fetch(url,{method:m,headers:this.H({"Content-Type":"application/json"}),body:JSON.stringify(f)})).json();
+      if(d.code!==200){alert(d.msg);return;}this.showDiseaseModal=false;this.loadDiseases();},
+    async delDisease(id){if(!confirm("删除该疾病将同时删除其诊断记录，确定？"))return;
+      const d=await(await fetch(API+"/product-info/"+id,{method:"DELETE",headers:this.H()})).json();if(d.code!==200)alert(d.msg);this.loadDiseases();},
+    async uploadDiseaseImg(ev,id){const f=ev.target.files[0];if(!f)return;const fd=new FormData();fd.append("image",f);
+      await fetch(API+"/product-info/"+id+"/image",{method:"POST",headers:this.H(),body:fd});this.loadDiseases();ev.target.value="";},
+    async loadRecords(){try{const q=this.recFilter?"?productId="+this.recFilter:"";this.records=(await(await fetch(API+"/production-record/list"+q,{headers:this.H()})).json()).data||[];}catch(e){}},
+    openRecordModal(r){this.recordForm=r?{id:r.id,productId:r.product_id,batchNumber:r.batch_number,productionLine:r.production_line,doctor:r.doctor,status:r.status,note:r.note}:{productId:""};this.showRecordModal=true;},
+    async saveRecord(){
+      if(!this.recordForm.productId){alert("请选择关联疾病");return;}
+      const f=this.recordForm,m=f.id?"PUT":"POST",url=API+"/production-record"+(f.id?"/"+f.id:"");
+      const d=await(await fetch(url,{method:m,headers:this.H({"Content-Type":"application/json"}),body:JSON.stringify(f)})).json();
+      if(d.code!==200){alert(d.msg);return;}this.showRecordModal=false;this.loadRecords();},
+    async delRecord(id){if(!confirm("确定删除该诊断记录？"))return;await fetch(API+"/production-record/"+id,{method:"DELETE",headers:this.H()});this.loadRecords();},
+    async uploadRecordImgs(ev,id){const fs=ev.target.files;if(!fs.length)return;const fd=new FormData();for(const f of fs)fd.append("images",f);
+      await fetch(API+"/production-record/"+id+"/images",{method:"POST",headers:this.H(),body:fd});this.loadRecords();ev.target.value="";},
+    async loadUsers(){try{this.users=(await(await fetch(API+"/user/page?username="+encodeURIComponent(this.userKw)+"&size=50",{headers:this.H()})).json()).data.records||[];}catch(e){}},
+    async toggleStatus(u){await fetch(API+"/user/"+u.id+"/status",{method:"PUT",headers:this.H({"Content-Type":"application/json"}),body:JSON.stringify({status:u.status===1?0:1})});this.loadUsers();},
+    async resetPwd(id){if(!confirm("确定重置该用户密码为 123456？"))return;await fetch(API+"/user/"+id+"/reset-password",{method:"PUT",headers:this.H()});alert("已重置为 123456");},
+    async delUser(id){if(!confirm("确定删除该用户？"))return;const d=await(await fetch(API+"/user/"+id,{method:"DELETE",headers:this.H()})).json();if(d.code!==200)alert(d.msg);this.loadUsers();},
+    async loadDashboard(){
+      if(this.isAdmin){try{this.stats=(await(await fetch(API+"/stats/overview",{headers:this.H()})).json()).data||{};}catch(e){}}
+      try{const s=(await(await fetch(API+"/knowledge-graph/stats",{headers:this.H()})).json()).data||{};
+        this.$nextTick(()=>{
+          if(!this.pie)this.pie=echarts.init(document.getElementById("pieChart"));
+          this.pie.setOption({tooltip:{},series:[{type:"pie",radius:["40%","68%"],data:(s.types||[]).map(t=>({name:t.type,value:t.c,itemStyle:{color:TYPE_COLOR[t.type]||"#909399"}})),label:{fontSize:11}}]});
+          if(!this.bar)this.bar=echarts.init(document.getElementById("barChart"));
+          const rels=(s.relations||[]);
+          this.bar.setOption({tooltip:{},grid:{left:96,right:24,top:10,bottom:20},xAxis:{type:"value"},yAxis:{type:"category",data:rels.map(r=>r.rel).reverse(),axisLabel:{fontSize:11}},series:[{type:"bar",data:rels.map(r=>r.c).reverse(),itemStyle:{color:"#1AAB94",borderRadius:[0,4,4,0]}}]});
+        });}catch(e){}
+    },
+    scroll(){this.$nextTick(()=>{const b=this.$refs.msgBox;if(b)b.scrollTop=b.scrollHeight;});}
+  }
+}).mount("#app");
+</script>
+</body>
+</html>

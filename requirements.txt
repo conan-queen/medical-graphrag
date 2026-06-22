@@ -1,0 +1,10 @@
+flask>=3.0
+flask-cors>=4.0
+neo4j>=5.20
+openai>=1.40
+PyJWT>=2.8
+python-docx>=1.1
+pdfplumber>=0.11
+python-dotenv>=1.0
+gunicorn>=21.2
+flask-limiter>=3.5
